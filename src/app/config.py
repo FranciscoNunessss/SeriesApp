@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     DATABASE_URL: str 
     DEBUG: bool = True
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
     model_config = SettingsConfigDict(
         env_file=".env",
