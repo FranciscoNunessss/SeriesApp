@@ -2,48 +2,72 @@
 .env
 .env.*
 !.env.example
+!.env.sample
 
-# Python cache/compiled
+# Python cache and bytecode
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Virtual environments
+# Python virtual environments
 .venv/
 venv/
 env/
 ENV/
 
-# Python tooling
+# Python tooling and test artifacts
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .pyre/
 .hypothesis/
+.tox/
+.nox/
 .coverage
 .coverage.*
 htmlcov/
-.tox/
-.nox/
+coverage/
 
-# Build artifacts
+# Python packaging/build outputs
 build/
 dist/
 *.egg-info/
+pip-wheel-metadata/
 
-# IDE/editor files
+# Node / frontend dependencies and builds
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.turbo/
+frontend/.cache/
+.pnpm-store/
+.npm/
+.yarn/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
+*.tmp
+*.temp
 
-# Logs
-*.log
-
-# Frontend dependencies/build
-frontend/node_modules/
-frontend/dist/
+# Docker and local overrides
+docker-compose.override.yml
 
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
