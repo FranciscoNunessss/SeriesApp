@@ -2,4 +2,5 @@ node_modules
 dist
 .vite
 .git
-Dockerfile
+Dockerfile*
+npm-debug.log*

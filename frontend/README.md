@@ -1,30 +1,45 @@
+# Frontend - Series Tracker
 
-  # Execute User Instructions
+Frontend React/Vite ligado ao backend FastAPI em `/api/v1`.
 
-  This is a code bundle for Execute User Instructions. The original project is available at https://www.figma.com/design/8uodpj32BEbZj19GR4i1qE/Execute-User-Instructions.
+## Requisitos
 
-## Running the code
+- Backend + base de dados já a correr em Docker (API exposta em `http://localhost:8000`)
+- Node.js 20+
 
-Run `npm i` to install the dependencies.
+## Configuração
 
-Run `npm run dev` to start the development server.
-
-The frontend talks to the backend at `http://localhost:8000/api/v1` by default.
-If you need a different address, set `VITE_API_BASE_URL` before starting Vite.
-
-To run the frontend in Docker production mode, use:
+1. Copia o ficheiro de exemplo de variáveis:
 
 ```bash
-docker compose --profile prod up -d --build
+Copy-Item .env.example .env
 ```
 
-Then open `http://localhost:3000`.
-
-For local development with hot reload inside Docker, use:
+2. Instala dependências:
 
 ```bash
-docker compose up -d --build
+npm install
 ```
 
-Then open `http://localhost:5173`.
-  
+3. Arranca o frontend:
+
+```bash
+npm run dev
+```
+
+Frontend disponível em `http://localhost:5173`.
+
+## Nota sobre API
+
+- `VITE_API_BASE_URL` define o endpoint do backend.
+- Valor default esperado para desenvolvimento local: `http://localhost:8000/api/v1`.
+
+## Se o Windows bloquear o Rollup (.node)
+
+Se aparecer erro de `Application Control` / `ERR_DLOPEN_FAILED` com `@rollup/rollup-win32-x64-msvc`, usa o frontend em Docker:
+
+```bash
+docker compose up -d --build frontend-dev
+```
+
+Depois abre `http://localhost:5173`.

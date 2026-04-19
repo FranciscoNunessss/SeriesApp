@@ -3,11 +3,11 @@ import { useParams, useNavigate } from 'react-router';
 import { Season, Episode, Series } from '../types';
 import { seasonsApi, episodesApi, seriesApi, watchedApi } from '../api';
 import { useActiveUser } from '../context/ActiveUserContext';
-import { Card, CardContent, CardHeader } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Textarea } from '../components/ui/textarea';
-import { Badge } from '../components/ui/badge';
+import { Card, CardContent } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Textarea } from '../components/ui/Textarea';
+import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { ArrowLeft, Plus, Edit, Trash2, Check, Play } from 'lucide-react';
@@ -21,12 +21,11 @@ export function SeasonDetailPage() {
   const [season, setSeason] = useState<Season | null>(null);
   const [series, setSeries] = useState<Series | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
-  const [watchedEpisodeIds, setWatchedEpisodeIds] = useState<Set<string>>(new Set());
+  const [watchedEpisodes, setWatchedEpisodes] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showCreateEpisode, setShowCreateEpisode] = useState(false);
   const [editingEpisode, setEditingEpisode] = useState<Episode | null>(null);
   const [deletingEpisode, setDeletingEpisode] = useState<Episode | null>(null);
-  const [markingWatched, setMarkingWatched] = useState<Episode | null>(null);
 
   useEffect(() => {
     if (seasonId) {
@@ -40,17 +39,45 @@ export function SeasonDetailPage() {
       const seasonData = await seasonsApi.getById(seasonId!);
       const seriesData = await seriesApi.getById(seasonData.series_id);
       const episodesData = await episodesApi.getBySeason(seasonId!);
-      const watchedIds = activeUserId ? await watchedApi.getWatchedEpisodeIds(activeUserId) : new Set<string>();
-      
+
       setSeason(seasonData);
       setSeries(seriesData);
       setEpisodes(episodesData.sort((a, b) => a.episode_number - b.episode_number));
-      setWatchedEpisodeIds(watchedIds);
+
+      if (activeUserId) {
+        const watchedHistory = await watchedApi.getUserHistory(activeUserId);
+        setWatchedEpisodes(new Set(watchedHistory.map((item) => item.episode_id)));
+      } else {
+        setWatchedEpisodes(new Set());
+      }
     } catch (error) {
-      toast.error('Failed to load season details');
+      toast.error('Erro ao carregar temporada');
       navigate('/series');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleToggleWatched(episodeId: number) {
+    if (!activeUserId) {
+      toast.error('Selecione um utilizador ativo para marcar episódios');
+      return;
+    }
+
+    try {
+      if (watchedEpisodes.has(episodeId)) {
+        // Não há API para desmarcar, então apenas mostramos mensagem
+        toast.info('Episódio já marcado como assistido');
+      } else {
+        await watchedApi.markAsWatched({
+          user_id: activeUserId,
+          episode_id: episodeId,
+        });
+        setWatchedEpisodes(prev => new Set(prev).add(episodeId));
+        toast.success('Episódio marcado como assistido');
+      }
+    } catch (error) {
+      toast.error('Erro ao marcar episódio');
     }
   }
 
@@ -62,16 +89,16 @@ export function SeasonDetailPage() {
   }) {
     try {
       await episodesApi.create(seasonId!, data);
-      toast.success('Episode created successfully');
+      toast.success('Episódio criado com sucesso');
       setShowCreateEpisode(false);
       loadData();
     } catch (error) {
-      toast.error('Failed to create episode');
+      toast.error('Erro ao criar episódio');
     }
   }
 
   async function handleUpdateEpisode(
-    episodeId: string,
+    episodeId: number,
     data: {
       episode_number: number;
       title: string;
@@ -81,49 +108,29 @@ export function SeasonDetailPage() {
   ) {
     try {
       await episodesApi.update(episodeId, data);
-      toast.success('Episode updated successfully');
+      toast.success('Episódio atualizado com sucesso');
       setEditingEpisode(null);
       loadData();
     } catch (error) {
-      toast.error('Failed to update episode');
+      toast.error('Erro ao atualizar episódio');
     }
   }
 
-  async function handleDeleteEpisode(episodeId: string) {
+  async function handleDeleteEpisode(episodeId: number) {
     try {
       await episodesApi.delete(episodeId);
-      toast.success('Episode deleted successfully');
+      toast.success('Episódio eliminado com sucesso');
       setDeletingEpisode(null);
       loadData();
     } catch (error) {
-      toast.error('Failed to delete episode');
-    }
-  }
-
-  async function handleMarkWatched(episodeId: string, rating?: number) {
-    if (!activeUserId) {
-      toast.error('Please select an active user first');
-      return;
-    }
-
-    try {
-      await watchedApi.markAsWatched({
-        user_id: activeUserId,
-        episode_id: episodeId,
-        rating,
-      });
-      toast.success('Episode marked as watched');
-      setMarkingWatched(null);
-      loadData();
-    } catch (error) {
-      toast.error('Episode already marked as watched');
+      toast.error('Erro ao eliminar episódio');
     }
   }
 
   if (loading || !season || !series) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-gray-500">A carregar...</div>
       </div>
     );
   }
@@ -139,19 +146,26 @@ export function SeasonDetailPage() {
           className="mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to {series.title}
+          Voltar
         </Button>
 
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl text-gray-900">Season {season.season_number}</h1>
+            <h1 className="text-3xl text-gray-900">
+              {series.title} - Temporada {season.season_number}
+            </h1>
             <p className="text-gray-600 mt-1">
-              {series.title} • {season.release_year}
+              {season.release_year} • {episodes.length} {episodes.length === 1 ? 'episódio' : 'episódios'}
             </p>
+            {!activeUserId && (
+              <p className="text-amber-700 mt-2 text-sm">
+                Selecione um utilizador ativo para marcar episódios como assistidos.
+              </p>
+            )}
           </div>
           <Button onClick={() => setShowCreateEpisode(true)}>
             <Plus className="w-5 h-5" />
-            Add Episode
+            Adicionar Episódio
           </Button>
         </div>
       </div>
@@ -161,48 +175,56 @@ export function SeasonDetailPage() {
         <Card>
           <CardContent className="text-center py-12">
             <Play className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg text-gray-900 mb-2">No episodes yet</h3>
-            <p className="text-gray-600 mb-4">Add episodes to this season</p>
+            <h3 className="text-lg text-gray-900 mb-2">Nenhum episódio</h3>
+            <p className="text-gray-600 mb-4">Adicione episódios a esta temporada</p>
             <Button onClick={() => setShowCreateEpisode(true)}>
               <Plus className="w-5 h-5" />
-              Add Episode
+              Adicionar Episódio
             </Button>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
           {episodes.map((episode) => {
-            const isWatched = watchedEpisodeIds.has(episode.id);
+            const isWatched = watchedEpisodes.has(episode.id);
 
             return (
-              <Card key={episode.id} className="hover:shadow-md transition-shadow">
+              <Card
+                key={episode.id}
+                className={`hover:shadow-md transition-shadow ${isWatched ? 'bg-green-50' : ''}`}
+              >
                 <CardContent className="p-6">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    {/* Checkbox */}
+                    <div className="flex-shrink-0 pt-1">
+                      <button
+                        onClick={() => handleToggleWatched(episode.id)}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                          isWatched
+                            ? 'bg-green-600 border-green-600'
+                            : 'border-gray-300 hover:border-green-600'
+                        }`}
+                      >
+                        {isWatched && <Check className="w-4 h-4 text-white" />}
+                      </button>
+                    </div>
+
+                    {/* Episode Content */}
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-3">
                         <Badge variant="default">Ep. {episode.episode_number}</Badge>
-                        <h3 className="text-lg text-gray-900">{episode.title}</h3>
-                        {isWatched && (
-                          <Badge variant="success">
-                            <Check className="w-3 h-3 mr-1" />
-                            Watched
-                          </Badge>
-                        )}
+                        <h3 className={`text-lg ${isWatched ? 'text-gray-600' : 'text-gray-900'}`}>
+                          {episode.title}
+                        </h3>
+                        <span className="text-sm text-gray-500">
+                          {episode.duration_minutes ? `${episode.duration_minutes} min` : 'Duração não definida'}
+                        </span>
                       </div>
-                      <p className="text-gray-600 text-sm">{episode.synopsis}</p>
-                      <p className="text-gray-500 text-sm">{episode.duration_minutes} minutes</p>
+                      <p className="text-gray-600 text-sm">{episode.synopsis ?? 'Sem sinopse'}</p>
                     </div>
+
+                    {/* Actions */}
                     <div className="flex items-center gap-2">
-                      {!isWatched && activeUserId && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setMarkingWatched(episode)}
-                        >
-                          <Check className="w-4 h-4" />
-                          Mark Watched
-                        </Button>
-                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -231,7 +253,7 @@ export function SeasonDetailPage() {
         isOpen={showCreateEpisode}
         onClose={() => setShowCreateEpisode(false)}
         onSubmit={handleCreateEpisode}
-        title="Add Episode"
+        title="Adicionar Episódio"
       />
 
       {/* Edit Episode Modal */}
@@ -240,7 +262,7 @@ export function SeasonDetailPage() {
           isOpen={true}
           onClose={() => setEditingEpisode(null)}
           onSubmit={(data) => handleUpdateEpisode(editingEpisode.id, data)}
-          title="Edit Episode"
+          title="Editar Episódio"
           initialData={editingEpisode}
         />
       )}
@@ -251,20 +273,10 @@ export function SeasonDetailPage() {
           isOpen={true}
           onClose={() => setDeletingEpisode(null)}
           onConfirm={() => handleDeleteEpisode(deletingEpisode.id)}
-          title="Delete Episode"
-          message={`Are you sure you want to delete "${deletingEpisode.title}"?`}
-          confirmText="Delete"
+          title="Eliminar Episódio"
+          message={`Tem certeza que deseja eliminar "${deletingEpisode.title}"?`}
+          confirmText="Eliminar"
           variant="danger"
-        />
-      )}
-
-      {/* Mark as Watched Modal */}
-      {markingWatched && (
-        <MarkWatchedModal
-          isOpen={true}
-          onClose={() => setMarkingWatched(null)}
-          onSubmit={(rating) => handleMarkWatched(markingWatched.id, rating)}
-          episode={markingWatched}
         />
       )}
     </div>
@@ -288,8 +300,8 @@ function EpisodeFormModal({ isOpen, onClose, onSubmit, title, initialData }: Epi
   const [formData, setFormData] = useState({
     episode_number: initialData?.episode_number || 1,
     title: initialData?.title || '',
-    duration_minutes: initialData?.duration_minutes || 45,
-    synopsis: initialData?.synopsis || '',
+    duration_minutes: initialData?.duration_minutes ?? 45,
+    synopsis: initialData?.synopsis ?? '',
   });
 
   useEffect(() => {
@@ -297,8 +309,8 @@ function EpisodeFormModal({ isOpen, onClose, onSubmit, title, initialData }: Epi
       setFormData({
         episode_number: initialData.episode_number,
         title: initialData.title,
-        duration_minutes: initialData.duration_minutes,
-        synopsis: initialData.synopsis,
+        duration_minutes: initialData.duration_minutes ?? 45,
+        synopsis: initialData.synopsis ?? '',
       });
     }
   }, [initialData]);
@@ -312,7 +324,7 @@ function EpisodeFormModal({ isOpen, onClose, onSubmit, title, initialData }: Epi
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
-          label="Episode Number"
+          label="Número do Episódio"
           type="number"
           min="1"
           required
@@ -322,14 +334,14 @@ function EpisodeFormModal({ isOpen, onClose, onSubmit, title, initialData }: Epi
           }
         />
         <Input
-          label="Title"
+          label="Título"
           required
-          placeholder="Enter episode title"
+          placeholder="Digite o título do episódio"
           value={formData.title}
           onChange={(e) => setFormData({ ...formData, title: e.target.value })}
         />
         <Input
-          label="Duration (minutes)"
+          label="Duração (minutos)"
           type="number"
           min="1"
           required
@@ -339,60 +351,18 @@ function EpisodeFormModal({ isOpen, onClose, onSubmit, title, initialData }: Epi
           }
         />
         <Textarea
-          label="Synopsis"
+          label="Sinopse"
           required
-          placeholder="Enter episode synopsis"
+          placeholder="Digite a sinopse do episódio"
           rows={4}
           value={formData.synopsis}
           onChange={(e) => setFormData({ ...formData, synopsis: e.target.value })}
         />
         <div className="flex gap-3 justify-end pt-4">
           <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
+            Cancelar
           </Button>
-          <Button type="submit">{initialData ? 'Update' : 'Create'}</Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-interface MarkWatchedModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (rating?: number) => void;
-  episode: Episode;
-}
-
-function MarkWatchedModal({ isOpen, onClose, onSubmit, episode }: MarkWatchedModalProps) {
-  const [rating, setRating] = useState<number | undefined>(undefined);
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    onSubmit(rating);
-  }
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Mark as Watched">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <h3 className="text-lg text-gray-900 mb-1">{episode.title}</h3>
-          <p className="text-gray-600 text-sm">Episode {episode.episode_number}</p>
-        </div>
-        <Input
-          label="Rating (Optional)"
-          type="number"
-          min="1"
-          max="10"
-          placeholder="Rate from 1 to 10"
-          value={rating || ''}
-          onChange={(e) => setRating(e.target.value ? parseInt(e.target.value) : undefined)}
-        />
-        <div className="flex gap-3 justify-end pt-4">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Mark as Watched</Button>
+          <Button type="submit">{initialData ? 'Atualizar' : 'Criar'}</Button>
         </div>
       </form>
     </Modal>

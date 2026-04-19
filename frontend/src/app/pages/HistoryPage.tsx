@@ -1,127 +1,131 @@
 import { useEffect, useState } from 'react';
-import { HistoryItem, User } from '../types';
-import { watchedApi, usersApi } from '../api';
+import { HistoryItem, Episode, Season, Series } from '../types';
+import { watchedApi, episodesApi, seasonsApi, seriesApi } from '../api';
 import { useActiveUser } from '../context/ActiveUserContext';
-import { Card, CardContent } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { Select } from '../components/ui/select';
+import { Card, CardContent } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
 import { History, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function HistoryPage() {
   const { activeUserId } = useActiveUser();
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadUsers();
-  }, []);
-
-  useEffect(() => {
-    if (activeUserId) {
-      setSelectedUserId(activeUserId);
-    }
+    loadHistory();
   }, [activeUserId]);
 
-  useEffect(() => {
-    if (selectedUserId) {
-      loadHistory(selectedUserId);
+  async function loadHistory() {
+    if (!activeUserId) {
+      setHistory([]);
+      setLoading(false);
+      return;
     }
-  }, [selectedUserId]);
 
-  async function loadUsers() {
-    try {
-      const data = await usersApi.getAll();
-      setUsers(data);
-    } catch (error) {
-      toast.error('Failed to load users');
-    }
-  }
-
-  async function loadHistory(userId: string) {
     try {
       setLoading(true);
-      const data = await watchedApi.getUserHistory(userId);
-      setHistory(data);
+      const watchedItems = await watchedApi.getUserHistory(activeUserId);
+
+      const episodesMap = new Map<number, Episode>();
+      const seasonsMap = new Map<number, Season>();
+      const seriesMap = new Map<number, Series>();
+
+      const items = await Promise.all(
+        watchedItems.map(async (watched): Promise<HistoryItem | null> => {
+          let episode = episodesMap.get(watched.episode_id);
+          if (!episode) {
+            episode = await episodesApi.getById(watched.episode_id);
+            episodesMap.set(episode.id, episode);
+          }
+
+          let season = seasonsMap.get(episode.season_id);
+          if (!season) {
+            season = await seasonsApi.getById(episode.season_id);
+            seasonsMap.set(season.id, season);
+          }
+
+          let series = seriesMap.get(season.series_id);
+          if (!series) {
+            series = await seriesApi.getById(season.series_id);
+            seriesMap.set(series.id, series);
+          }
+
+          return {
+            id: watched.id,
+            series_title: series.title,
+            season_number: season.season_number,
+            episode_number: episode.episode_number,
+            episode_title: episode.title,
+            watched_at: watched.watched_at,
+            rating: watched.rating,
+          };
+        }),
+      );
+
+      setHistory(items.filter((item): item is HistoryItem => item !== null));
     } catch (error) {
-      toast.error('Failed to load watch history');
+      toast.error('Erro ao carregar histórico');
+      setHistory([]);
     } finally {
       setLoading(false);
     }
   }
 
-  const selectedUser = users.find((u) => u.id === selectedUserId);
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl text-gray-900">Watch History</h1>
-          <p className="text-gray-600 mt-1">View watched episodes and ratings</p>
-        </div>
-        <div className="w-64">
-          <Select
-            label="Select User"
-            value={selectedUserId || ''}
-            onChange={(e) => setSelectedUserId(e.target.value)}
-          >
-            <option value="">Choose a user</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.username}
-              </option>
-            ))}
-          </Select>
-        </div>
+      <div>
+        <h1 className="text-3xl text-gray-900">Histórico</h1>
+        <p className="text-gray-600 mt-1">Episódios assistidos do utilizador ativo, ordenados por data</p>
       </div>
 
       {/* Content */}
-      {!selectedUserId ? (
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-gray-500">A carregar...</div>
+        </div>
+      ) : !activeUserId ? (
         <Card>
           <CardContent className="text-center py-12">
             <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg text-gray-900 mb-2">Select a user</h3>
-            <p className="text-gray-600">Choose a user to view their watch history</p>
+            <h3 className="text-lg text-gray-900 mb-2">Sem utilizador ativo</h3>
+            <p className="text-gray-600">
+              Selecione um utilizador no topo para consultar o histórico.
+            </p>
           </CardContent>
         </Card>
-      ) : loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-gray-500">Loading history...</div>
-        </div>
       ) : history.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
             <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg text-gray-900 mb-2">No watch history</h3>
+            <h3 className="text-lg text-gray-900 mb-2">Nenhum histórico</h3>
             <p className="text-gray-600">
-              {selectedUser?.username} hasn't watched any episodes yet
+              Este utilizador ainda não assistiu nenhum episódio.
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
           {history.map((item) => (
-            <Card key={item.id} className="hover:shadow-md transition-shadow">
+            <Card key={item.id}>
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-2">
                       <h3 className="text-lg text-gray-900">{item.series_title}</h3>
                       {item.rating && (
-                        <Badge variant="warning" className="flex items-center gap-1">
+                        <Badge variant="default" className="flex items-center gap-1">
                           <Star className="w-3 h-3 fill-current" />
                           {item.rating}/10
                         </Badge>
                       )}
                     </div>
                     <p className="text-gray-600">
-                      Season {item.season_number}, Episode {item.episode_number}: {item.episode_title}
+                      Temporada {item.season_number}, Episódio {item.episode_number}: {item.episode_title}
                     </p>
                     <p className="text-gray-500 text-sm">
-                      Watched on {new Date(item.watched_at).toLocaleDateString('en-US', {
+                      Assistido em {new Date(item.watched_at).toLocaleDateString('pt-PT', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',

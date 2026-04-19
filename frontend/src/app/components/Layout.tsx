@@ -1,8 +1,8 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
-import { Tv, Users, History } from 'lucide-react';
-import { UserSelector } from './UserSelector';
+import { Tv, History, Home, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { UserSelector } from './UserSelector';
 
 interface LayoutProps {
   children: ReactNode;
@@ -12,9 +12,10 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
 
   const navItems = [
-    { path: '/users', label: 'Users', icon: Users },
-    { path: '/series', label: 'Series', icon: Tv },
-    { path: '/history', label: 'History', icon: History },
+    { path: '/', label: 'Home', icon: Home, exact: true },
+    { path: '/series', label: 'Séries', icon: Tv },
+    { path: '/users', label: 'Usuários', icon: Users },
+    { path: '/history', label: 'Histórico', icon: History },
   ];
 
   return (
@@ -26,22 +27,24 @@ export function Layout({ children }: LayoutProps) {
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2">
               <Tv className="w-8 h-8 text-blue-600" />
-              <span className="text-xl text-gray-900">Series Tracking Platform</span>
+              <span className="text-xl text-gray-900">Series Tracker</span>
             </Link>
 
             {/* Navigation Links */}
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = location.pathname.startsWith(item.path);
+                const isActive = item.exact
+                  ? location.pathname === item.path
+                  : location.pathname.startsWith(item.path);
                 return (
                   <Link
                     key={item.path}
                     to={item.path}
                     className={cn(
-                      'flex items-center gap-2 px-3 py-2 rounded-lg transition-colors',
+                      'flex items-center gap-2 px-4 py-2 rounded-lg transition-colors',
                       isActive
-                        ? 'bg-blue-50 text-blue-600'
+                        ? 'bg-blue-600 text-white'
                         : 'text-gray-600 hover:bg-gray-100'
                     )}
                   >
@@ -51,12 +54,15 @@ export function Layout({ children }: LayoutProps) {
                 );
               })}
             </div>
-
-            {/* User Selector */}
-            <UserSelector />
           </div>
         </div>
       </nav>
+
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <UserSelector />
+        </div>
+      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

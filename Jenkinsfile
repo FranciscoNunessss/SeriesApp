@@ -73,7 +73,10 @@ pipeline {
 			steps {
 				sh '''
 					docker build -t seriesapp-api:${BUILD_NUMBER} .
-					docker build -t seriesapp-frontend:${BUILD_NUMBER} ./frontend
+					docker build \
+					  --build-arg VITE_API_BASE_URL=http://localhost:8000/api/v1 \
+					  -t seriesapp-frontend:${BUILD_NUMBER} \
+					  ./frontend
 				'''
 			}
 		}

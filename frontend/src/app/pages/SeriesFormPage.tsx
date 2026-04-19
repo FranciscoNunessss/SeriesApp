@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { seriesApi } from '../api';
-import { Card, CardContent, CardHeader } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Textarea } from '../components/ui/textarea';
-import { Select } from '../components/ui/select';
+import { Card, CardContent, CardHeader } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Textarea } from '../components/ui/Textarea';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -37,11 +36,11 @@ export function SeriesFormPage() {
       const data = await seriesApi.getById(id);
       setFormData({
         title: data.title,
-        description: data.description,
-        genre: data.genre,
-        release_year: data.release_year,
-        status: data.status,
-        total_seasons: data.total_seasons,
+        description: data.description ?? '',
+        genre: data.genre ?? '',
+        release_year: data.release_year ?? new Date().getFullYear(),
+        status: (data.status as 'ongoing' | 'completed' | 'cancelled') ?? 'ongoing',
+        total_seasons: data.total_seasons ?? 1,
       });
     } catch (error) {
       toast.error('Failed to load series');
@@ -138,21 +137,24 @@ export function SeriesFormPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Select
-                label="Status"
-                required
-                value={formData.status}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    status: e.target.value as 'ongoing' | 'completed' | 'cancelled',
-                  })
-                }
-              >
-                <option value="ongoing">Ongoing</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </Select>
+              <div>
+                <label className="block text-sm mb-2">Status</label>
+                <select
+                  required
+                  className="h-9 w-full rounded-md border border-input bg-input-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                  value={formData.status}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      status: e.target.value as 'ongoing' | 'completed' | 'cancelled',
+                    })
+                  }
+                >
+                  <option value="ongoing">Ongoing</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
 
               <Input
                 label="Total Seasons"

@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Series } from '../types';
 import { seriesApi } from '../api';
-import { Card, CardContent } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Badge } from '../components/ui/badge';
+import { Card, CardContent } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Badge } from '../components/ui/Badge';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Plus, Search, Edit, Trash2, Eye, Tv } from 'lucide-react';
 import { toast } from 'sonner';
@@ -26,7 +26,7 @@ export function SeriesListPage() {
       const filtered = series.filter(
         (s) =>
           s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.genre.toLowerCase().includes(searchQuery.toLowerCase())
+          (s.genre ?? '').toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredSeries(filtered);
     } else {
@@ -41,31 +41,31 @@ export function SeriesListPage() {
       setSeries(data);
       setFilteredSeries(data);
     } catch (error) {
-      toast.error('Failed to load series');
+      toast.error('Erro ao carregar séries');
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(seriesId: string) {
+  async function handleDelete(seriesId: number) {
     try {
       await seriesApi.delete(seriesId);
-      toast.success('Series deleted successfully');
+      toast.success('Série eliminada com sucesso');
       setDeleteConfirm(null);
       loadSeries();
     } catch (error) {
-      toast.error('Failed to delete series');
+      toast.error('Erro ao eliminar série');
     }
   }
 
-  const getStatusVariant = (status: string) => {
+  const getStatusVariant = (status: string | null) => {
     switch (status) {
       case 'completed':
-        return 'success';
+        return 'secondary';
       case 'ongoing':
-        return 'info';
+        return 'default';
       case 'cancelled':
-        return 'danger';
+        return 'destructive';
       default:
         return 'default';
     }
@@ -74,7 +74,7 @@ export function SeriesListPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading series...</div>
+        <div className="text-gray-500">A carregar...</div>
       </div>
     );
   }
@@ -84,13 +84,13 @@ export function SeriesListPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl text-gray-900">Series</h1>
-          <p className="text-gray-600 mt-1">Browse and manage your series collection</p>
+          <h1 className="text-3xl text-gray-900">Minhas Séries</h1>
+          <p className="text-gray-600 mt-1">Gerencie sua coleção de séries</p>
         </div>
         <Link to="/series/new">
           <Button>
             <Plus className="w-5 h-5" />
-            Add Series
+            Adicionar Série
           </Button>
         </Link>
       </div>
@@ -100,7 +100,7 @@ export function SeriesListPage() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
         <Input
           type="text"
-          placeholder="Search series by title or genre..."
+          placeholder="Pesquisar por título ou gênero..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10"
@@ -113,18 +113,18 @@ export function SeriesListPage() {
           <CardContent className="text-center py-12">
             <Tv className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg text-gray-900 mb-2">
-              {searchQuery ? 'No series found' : 'No series yet'}
+              {searchQuery ? 'Nenhuma série encontrada' : 'Nenhuma série adicionada'}
             </h3>
             <p className="text-gray-600 mb-4">
               {searchQuery
-                ? 'Try adjusting your search query'
-                : 'Get started by adding your first series'}
+                ? 'Tente ajustar sua pesquisa'
+                : 'Adicione sua primeira série para começar'}
             </p>
             {!searchQuery && (
               <Link to="/series/new">
                 <Button>
                   <Plus className="w-5 h-5" />
-                  Add Series
+                  Adicionar Série
                 </Button>
               </Link>
             )}
@@ -136,25 +136,27 @@ export function SeriesListPage() {
             <Card key={item.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="space-y-3">
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-2">
                     <h3 className="text-lg text-gray-900 line-clamp-1">{item.title}</h3>
                     <Badge variant={getStatusVariant(item.status)}>
-                      {item.status}
+                      {item.status ?? 'sem estado'}
                     </Badge>
                   </div>
-                  <p className="text-gray-600 text-sm line-clamp-2">{item.description}</p>
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <span>{item.genre}</span>
+                  <p className="text-gray-600 text-sm line-clamp-2">{item.description ?? 'Sem descrição'}</p>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <span>{item.genre ?? 'Sem género'}</span>
                     <span>•</span>
-                    <span>{item.release_year}</span>
-                    <span>•</span>
-                    <span>{item.total_seasons} seasons</span>
+                    <span>{item.release_year ?? 'Ano N/D'}</span>
                   </div>
-                  <div className="flex items-center gap-2 pt-2">
+                  <div className="text-sm text-gray-500">
+                    {item.total_seasons ?? 0} {(item.total_seasons ?? 0) === 1 ? 'temporada' : 'temporadas'}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
                     <Link to={`/series/${item.id}`} className="flex-1">
                       <Button variant="secondary" size="sm" className="w-full">
                         <Eye className="w-4 h-4" />
-                        View Details
+                        Ver
                       </Button>
                     </Link>
                     <Link to={`/series/${item.id}/edit`}>
@@ -183,9 +185,9 @@ export function SeriesListPage() {
           isOpen={true}
           onClose={() => setDeleteConfirm(null)}
           onConfirm={() => handleDelete(deleteConfirm.id)}
-          title="Delete Series"
-          message={`Are you sure you want to delete "${deleteConfirm.title}"? This action cannot be undone.`}
-          confirmText="Delete"
+          title="Eliminar Série"
+          message={`Tem certeza que deseja eliminar "${deleteConfirm.title}"? Esta ação não pode ser desfeita.`}
+          confirmText="Eliminar"
           variant="danger"
         />
       )}
