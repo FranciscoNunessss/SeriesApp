@@ -1,90 +1,95 @@
 pipeline {
-	agent none
+    agent any
 
-	options {
-		timestamps()
-		disableConcurrentBuilds()
-		skipDefaultCheckout(true)
-	}
+    environment {
+        DOCKERHUB_CREDENTIALS_ID = 'dockerhub-credentials'
+        DOCKERHUB_USERNAME       = 'SEU_USERNAME_DOCKERHUB'
+        IMAGE_BACKEND            = "${franciscovelhinho99}/seriesapp-backend"
+        IMAGE_FRONTEND           = "${franciscovelhinho99}/seriesapp-frontend"
+        EMAIL_RECIPIENT          = 'SEU_EMAIL@exemplo.com'
+    }
 
-	environment {
-		PIP_DISABLE_PIP_VERSION_CHECK = '1'
-		PYTHONDONTWRITEBYTECODE = '1'
-		PYTHONUNBUFFERED = '1'
-		NPM_CONFIG_AUDIT = 'false'
-		NPM_CONFIG_FUND = 'false'
-	}
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
 
-	stages {
-		stage('Checkout') {
-			agent any
-			steps {
-				checkout scm
-			}
-		}
+        stage('Build Backend') {
+            steps {
+                script {
+                    backendImage = docker.build(
+                        "${IMAGE_BACKEND}:${BUILD_NUMBER}",
+                        "-f Dockerfile ."
+                    )
+                }
+            }
+        }
 
-		stage('Backend Checks') {
-			agent {
-				docker {
-					image 'python:3.14-slim'
-					reuseNode true
-				}
-			}
-			steps {
-				sh '''
-					python -m pip install --upgrade pip
-					pip install -r requirements.txt
-					python -m compileall src
-					pip check
-				'''
-			}
-		}
+        stage('Build Frontend') {
+            steps {
+                script {
+                    frontendImage = docker.build(
+                        "${IMAGE_FRONTEND}:${BUILD_NUMBER}",
+                        "--build-arg VITE_API_BASE_URL=http://SEU_SERVIDOR_IP:8000/api/v1 -f frontend/Dockerfile ./frontend"
+                    )
+                }
+            }
+        }
 
-		stage('Frontend Build') {
-			agent {
-				docker {
-					image 'node:20-alpine'
-					reuseNode true
-				}
-			}
-			steps {
-				dir('frontend') {
-					sh '''
-						npm ci
-						npm run build
-					'''
-				}
-			}
-			post {
-				success {
-					archiveArtifacts artifacts: 'frontend/dist/**', allowEmptyArchive: true
-				}
-			}
-		}
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', DOCKERHUB_CREDENTIALS_ID) {
+                        backendImage.push("${BUILD_NUMBER}")
+                        backendImage.push('latest')
+                        frontendImage.push("${BUILD_NUMBER}")
+                        frontendImage.push('latest')
+                    }
+                }
+            }
+        }
 
-		stage('Docker Images') {
-			when {
-				anyOf {
-					branch 'main'
-					branch 'master'
-				}
-			}
-			agent any
-			steps {
-				sh '''
-					docker build -t seriesapp-api:${BUILD_NUMBER} .
-					docker build \
-					  --build-arg VITE_API_BASE_URL=http://localhost:8000/api/v1 \
-					  -t seriesapp-frontend:${BUILD_NUMBER} \
-					  ./frontend
-				'''
-			}
-		}
-	}
+        stage('Deploy with Ansible') {
+            steps {
+                sh "ansible-playbook -i ansible/inventory ansible/playbook.yml --extra-vars 'image_tag=${BUILD_NUMBER}'"
+            }
+        }
+    }
 
-	post {
-		always {
-			cleanWs()
-		}
-	}
+    post {
+        success {
+            emailext(
+                subject: "[SUCCESS] ${JOB_NAME} - Build #${BUILD_NUMBER}",
+                body: """
+                    <h2>Pipeline concluido com sucesso!</h2>
+                    <p><b>Job:</b> ${JOB_NAME}</p>
+                    <p><b>Build:</b> #${BUILD_NUMBER}</p>
+                    <p><b>Imagens publicadas no Docker Hub:</b></p>
+                    <ul>
+                        <li>${IMAGE_BACKEND}:${BUILD_NUMBER}</li>
+                        <li>${IMAGE_FRONTEND}:${BUILD_NUMBER}</li>
+                    </ul>
+                    <p><a href="${BUILD_URL}">Ver build no Jenkins</a></p>
+                """,
+                mimeType: 'text/html',
+                to: "${EMAIL_RECIPIENT}"
+            )
+        }
+        failure {
+            emailext(
+                subject: "[FAILED] ${JOB_NAME} - Build #${BUILD_NUMBER}",
+                body: """
+                    <h2>O pipeline falhou!</h2>
+                    <p><b>Job:</b> ${JOB_NAME}</p>
+                    <p><b>Build:</b> #${BUILD_NUMBER}</p>
+                    <p>Verifica os logs para mais detalhes.</p>
+                    <p><a href="${BUILD_URL}console">Ver logs no Jenkins</a></p>
+                """,
+                mimeType: 'text/html',
+                to: "${EMAIL_RECIPIENT}"
+            )
+        }
+    }
 }

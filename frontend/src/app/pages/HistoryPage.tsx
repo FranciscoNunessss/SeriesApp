@@ -1,142 +1,164 @@
 import { useEffect, useState } from 'react';
-import { HistoryItem, Episode, Season, Series } from '../types';
-import { watchedApi, episodesApi, seasonsApi, seriesApi } from '../api';
+import { HistoryItem, User } from '../types';
+import { watchedApi, usersApi } from '../api';
 import { useActiveUser } from '../context/ActiveUserContext';
-import { Card, CardContent } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
-import { History, Star } from 'lucide-react';
+import { Badge } from '../components/ui/badge';
+import { Select } from '../components/ui/select';
+import { History, Star, Tv, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function HistoryPage() {
   const { activeUserId } = useActiveUser();
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadHistory();
+    loadUsers();
+  }, []);
+
+  useEffect(() => {
+    if (activeUserId) {
+      setSelectedUserId(activeUserId);
+    }
   }, [activeUserId]);
 
-  async function loadHistory() {
-    if (!activeUserId) {
-      setHistory([]);
-      setLoading(false);
-      return;
+  useEffect(() => {
+    if (selectedUserId) {
+      loadHistory(selectedUserId);
     }
+  }, [selectedUserId]);
 
+  async function loadUsers() {
+    try {
+      const data = await usersApi.getAll();
+      setUsers(data);
+    } catch (error) {
+      toast.error('Failed to load users');
+    }
+  }
+
+  async function loadHistory(userId: string) {
     try {
       setLoading(true);
-      const watchedItems = await watchedApi.getUserHistory(activeUserId);
-
-      const episodesMap = new Map<number, Episode>();
-      const seasonsMap = new Map<number, Season>();
-      const seriesMap = new Map<number, Series>();
-
-      const items = await Promise.all(
-        watchedItems.map(async (watched): Promise<HistoryItem | null> => {
-          let episode = episodesMap.get(watched.episode_id);
-          if (!episode) {
-            episode = await episodesApi.getById(watched.episode_id);
-            episodesMap.set(episode.id, episode);
-          }
-
-          let season = seasonsMap.get(episode.season_id);
-          if (!season) {
-            season = await seasonsApi.getById(episode.season_id);
-            seasonsMap.set(season.id, season);
-          }
-
-          let series = seriesMap.get(season.series_id);
-          if (!series) {
-            series = await seriesApi.getById(season.series_id);
-            seriesMap.set(series.id, series);
-          }
-
-          return {
-            id: watched.id,
-            series_title: series.title,
-            season_number: season.season_number,
-            episode_number: episode.episode_number,
-            episode_title: episode.title,
-            watched_at: watched.watched_at,
-            rating: watched.rating,
-          };
-        }),
-      );
-
-      setHistory(items.filter((item): item is HistoryItem => item !== null));
+      const data = await watchedApi.getUserHistory(userId);
+      setHistory(data);
     } catch (error) {
-      toast.error('Erro ao carregar histórico');
-      setHistory([]);
+      toast.error('Failed to load watch history');
     } finally {
       setLoading(false);
     }
   }
 
+  const selectedUser = users.find((u) => u.id === selectedUserId);
+
+  // Group history by series
+  const groupedHistory = history.reduce<Record<string, HistoryItem[]>>((acc, item) => {
+    if (!acc[item.series_title]) {
+      acc[item.series_title] = [];
+    }
+    acc[item.series_title].push(item);
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl text-gray-900">Histórico</h1>
-        <p className="text-gray-600 mt-1">Episódios assistidos do utilizador ativo, ordenados por data</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Watch History</h1>
+          <p className="text-slate-400 mt-0.5 text-sm">
+            {selectedUser
+              ? `${history.length} episodes watched by ${selectedUser.username}`
+              : 'Select a user to view their history'}
+          </p>
+        </div>
+        <div className="w-52 flex-shrink-0">
+          <Select
+            value={selectedUserId || ''}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+            className="bg-[#13131f] border-white/[0.08] text-slate-200"
+          >
+            <option value="">Choose a user</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.username}
+              </option>
+            ))}
+          </Select>
+        </div>
       </div>
 
       {/* Content */}
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-gray-500">A carregar...</div>
+      {!selectedUserId ? (
+        <div className="rounded-xl bg-[#13131f] border border-white/[0.06] py-20 text-center">
+          <div className="w-14 h-14 bg-white/[0.04] rounded-xl flex items-center justify-center mx-auto mb-4">
+            <History className="w-7 h-7 text-slate-600" />
+          </div>
+          <h3 className="text-sm font-semibold text-white mb-1">Select a user</h3>
+          <p className="text-slate-500 text-sm">Choose a user above to view their watch history</p>
         </div>
-      ) : !activeUserId ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg text-gray-900 mb-2">Sem utilizador ativo</h3>
-            <p className="text-gray-600">
-              Selecione um utilizador no topo para consultar o histórico.
-            </p>
-          </CardContent>
-        </Card>
-      ) : history.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg text-gray-900 mb-2">Nenhum histórico</h3>
-            <p className="text-gray-600">
-              Este utilizador ainda não assistiu nenhum episódio.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
+      ) : loading ? (
         <div className="space-y-3">
-          {history.map((item) => (
-            <Card key={item.id}>
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg text-gray-900">{item.series_title}</h3>
-                      {item.rating && (
-                        <Badge variant="default" className="flex items-center gap-1">
-                          <Star className="w-3 h-3 fill-current" />
-                          {item.rating}/10
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-gray-600">
-                      Temporada {item.season_number}, Episódio {item.episode_number}: {item.episode_title}
-                    </p>
-                    <p className="text-gray-500 text-sm">
-                      Assistido em {new Date(item.watched_at).toLocaleDateString('pt-PT', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  </div>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-24 bg-[#13131f] rounded-xl border border-white/[0.06] animate-pulse" />
+          ))}
+        </div>
+      ) : history.length === 0 ? (
+        <div className="rounded-xl bg-[#13131f] border border-white/[0.06] py-20 text-center">
+          <div className="w-14 h-14 bg-white/[0.04] rounded-xl flex items-center justify-center mx-auto mb-4">
+            <Tv className="w-7 h-7 text-slate-600" />
+          </div>
+          <h3 className="text-sm font-semibold text-white mb-1">No watch history</h3>
+          <p className="text-slate-500 text-sm">
+            {selectedUser?.username} hasn't watched any episodes yet
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {Object.entries(groupedHistory).map(([seriesTitle, items]) => (
+            <div key={seriesTitle} className="rounded-xl bg-[#13131f] border border-white/[0.06] overflow-hidden">
+              {/* Series header */}
+              <div className="flex items-center gap-3 px-5 py-3 border-b border-white/[0.04] bg-white/[0.02]">
+                <div className="w-7 h-7 bg-violet-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Tv className="w-3.5 h-3.5 text-violet-400" />
                 </div>
-              </CardContent>
-            </Card>
+                <span className="text-sm font-semibold text-white">{seriesTitle}</span>
+                <span className="text-xs text-slate-500 ml-auto">{items.length} {items.length === 1 ? 'episode' : 'episodes'}</span>
+              </div>
+
+              {/* Episodes */}
+              <div className="divide-y divide-white/[0.03]">
+                {items.map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 px-5 py-3 hover:bg-white/[0.02] transition-colors">
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-700 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-slate-300 truncate">
+                        <span className="text-slate-500">S{item.season_number}E{item.episode_number}</span>
+                        {' · '}
+                        {item.episode_title}
+                      </p>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        {new Date(item.watched_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
+                    {item.rating && (
+                      <Badge variant="warning" className="flex items-center gap-1 flex-shrink-0">
+                        <Star className="w-2.5 h-2.5 fill-current" />
+                        {item.rating}/10
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}

@@ -1,47 +1,49 @@
 export interface User {
-  id: number;
+  id: string;
   username: string;
   email: string;
   created_at: string;
 }
 
 export interface Series {
-  id: number;
+  id: string;
   title: string;
-  description: string | null;
-  genre: string | null;
-  release_year: number | null;
-  status: string | null;
-  total_seasons: number | null;
+  description: string;
+  genre: string;
+  release_year: number;
+  status: 'ongoing' | 'completed' | 'cancelled';
+  total_seasons: number;
   created_at: string;
 }
 
 export interface Season {
-  id: number;
-  series_id: number;
+  id: string;
+  series_id: string;
   season_number: number;
-  release_year: number | null;
+  release_year: number;
+  created_at: string;
 }
 
 export interface Episode {
-  id: number;
-  season_id: number;
+  id: string;
+  season_id: string;
   episode_number: number;
   title: string;
-  duration_minutes: number | null;
-  synopsis: string | null;
+  duration_minutes: number;
+  synopsis: string;
+  created_at: string;
 }
 
 export interface WatchedEpisode {
-  id: number;
-  user_id: number;
-  episode_id: number;
+  id: string;
+  user_id: string;
+  episode_id: string;
   watched_at: string;
   rating?: number;
 }
 
 export interface HistoryItem {
-  id: number;
+  id: string;
   series_title: string;
   season_number: number;
   episode_number: number;
@@ -51,33 +53,8 @@ export interface HistoryItem {
 }
 
 export interface UserProgress {
-  series_id: number;
+  series_id: string;
   total_episodes: number;
   watched_episodes: number;
-  progress_percent: number;
-}
-
-export interface NextEpisode {
-  episode_id: number;
-  episode_number: number;
-  episode_title: string;
-  season_id: number;
-  season_number: number;
-  series_id: number;
-  series_title: string;
-  synopsis: string | null;
-  duration_minutes: number | null;
-}
-
-export interface UserStatistics {
-  total_watched: number;
-  total_time_minutes: number;
-  series_in_progress: number;
-  series_completed: number;
-  average_rating: number;
-  total_series: number;
-}
-
-export interface SeriesWithProgress extends Series {
-  progress?: UserProgress;
+  percentage: number;
 }

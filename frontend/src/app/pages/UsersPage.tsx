@@ -2,14 +2,38 @@ import { useEffect, useState } from 'react';
 import { User } from '../types';
 import { usersApi } from '../api';
 import { useActiveUser } from '../context/ActiveUserContext';
-import { Card, CardContent, CardHeader } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { Modal } from '../components/ui/Modal';
-import { Badge } from '../components/ui/Badge';
-import { Breadcrumbs } from '../components/Breadcrumbs';
-import { UserCircle, Edit, Plus, Check } from 'lucide-react';
+import { Badge } from '../components/ui/badge';
+import { Plus, Edit, Check, Users } from 'lucide-react';
 import { toast } from 'sonner';
+
+function UserAvatar({ username }: { username: string }) {
+  const initials = username
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+
+  const colors = [
+    'from-violet-500 to-indigo-600',
+    'from-blue-500 to-cyan-600',
+    'from-emerald-500 to-teal-600',
+    'from-orange-500 to-amber-600',
+    'from-pink-500 to-rose-600',
+  ];
+  const colorIndex = username.charCodeAt(0) % colors.length;
+
+  return (
+    <div
+      className={`w-11 h-11 rounded-xl bg-gradient-to-br ${colors[colorIndex]} flex items-center justify-center flex-shrink-0 shadow-lg`}
+    >
+      <span className="text-sm font-bold text-white">{initials}</span>
+    </div>
+  );
+}
 
 export function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -45,7 +69,7 @@ export function UsersPage() {
     }
   }
 
-  async function handleUpdateUser(userId: number, data: { username: string; email: string }) {
+  async function handleUpdateUser(userId: string, data: { username: string; email: string }) {
     try {
       await usersApi.update(userId, data);
       toast.success('User updated successfully');
@@ -58,83 +82,108 @@ export function UsersPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading users...</div>
+      <div className="space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="h-8 w-24 bg-white/[0.06] rounded-lg" />
+          <div className="h-9 w-28 bg-white/[0.06] rounded-lg" />
+        </div>
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-20 bg-[#13131f] rounded-xl border border-white/[0.06]" />
+        ))}
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs items={[{ label: 'Usuários' }]} />
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl text-gray-900">Usuários</h1>
-          <p className="text-gray-600 mt-1">Gerencie usuários e selecione o usuário ativo</p>
+          <h1 className="text-2xl font-bold text-white">Users</h1>
+          <p className="text-slate-400 mt-0.5 text-sm">
+            {users.length > 0
+              ? `${users.length} ${users.length === 1 ? 'user' : 'users'} — select one to track progress`
+              : 'Manage users and select the active user'}
+          </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="w-5 h-5" />
-          Adicionar Usuário
+        <Button
+          className="bg-violet-600 hover:bg-violet-500 text-white border-0 shadow-lg shadow-violet-600/20"
+          onClick={() => setShowCreateModal(true)}
+        >
+          <Plus className="w-4 h-4" />
+          Add User
         </Button>
       </div>
 
       {/* Users List */}
       {users.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <UserCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg text-gray-900 mb-2">No users yet</h3>
-            <p className="text-gray-600 mb-4">Get started by creating your first user</p>
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="w-5 h-5" />
-              Create User
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl bg-[#13131f] border border-white/[0.06] py-20 text-center">
+          <div className="w-14 h-14 bg-white/[0.04] rounded-xl flex items-center justify-center mx-auto mb-4">
+            <Users className="w-7 h-7 text-slate-600" />
+          </div>
+          <h3 className="text-sm font-semibold text-white mb-1">No users yet</h3>
+          <p className="text-slate-500 text-sm mb-5">Create your first user to start tracking</p>
+          <Button
+            className="bg-violet-600 hover:bg-violet-500 text-white border-0"
+            onClick={() => setShowCreateModal(true)}
+          >
+            <Plus className="w-4 h-4" />
+            Create User
+          </Button>
+        </div>
       ) : (
-        <div className="grid gap-4">
-          {users.map((user) => (
-            <Card key={user.id}>
-              <CardContent className="flex items-center justify-between py-4">
-                <div className="flex items-center gap-4">
-                  <UserCircle className="w-10 h-10 text-gray-400" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg text-gray-900">{user.username}</h3>
-                      {activeUserId === user.id && (
-                        <Badge variant="info">
-                          <Check className="w-3 h-3 mr-1" />
-                          Active
-                        </Badge>
-                      )}
+        <div className="space-y-2">
+          {users.map((user) => {
+            const isActive = activeUserId === user.id;
+            return (
+              <div
+                key={user.id}
+                className={`rounded-xl border transition-all duration-200 ${
+                  isActive
+                    ? 'bg-violet-500/[0.06] border-violet-500/25'
+                    : 'bg-[#13131f] border-white/[0.06] hover:border-white/[0.10]'
+                }`}
+              >
+                <div className="flex items-center justify-between px-5 py-4">
+                  <div className="flex items-center gap-3.5">
+                    <UserAvatar username={user.username} />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-white">{user.username}</span>
+                        {isActive && (
+                          <Badge variant="info" className="text-[10px] px-1.5 py-0">
+                            <Check className="w-2.5 h-2.5" />
+                            Active
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{user.email}</p>
                     </div>
-                    <p className="text-gray-600">{user.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!isActive && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-400 hover:text-white hover:bg-white/[0.06] text-xs h-8 px-3"
+                        onClick={() => setActiveUserId(user.id)}
+                      >
+                        Set Active
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-slate-600 hover:text-slate-200 hover:bg-white/[0.06] h-8 w-8 p-0"
+                      onClick={() => setEditingUser(user)}
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {activeUserId !== user.id && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setActiveUserId(user.id)}
-                    >
-                      Set as Active
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditingUser(user)}
-                  >
-                    <Edit className="w-4 h-4" />
-                    Edit
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -209,7 +258,7 @@ function UserFormModal({ isOpen, onClose, onSubmit, title, initialData }: UserFo
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit">
+          <Button type="submit" className="bg-violet-600 hover:bg-violet-500 text-white border-0">
             {initialData ? 'Update' : 'Create'}
           </Button>
         </div>

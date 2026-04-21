@@ -1,14 +1,14 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
 interface ActiveUserContextType {
-  activeUserId: number | null;
-  setActiveUserId: (userId: number | null) => void;
+  activeUserId: string | null;
+  setActiveUserId: (userId: string | null) => void;
 }
 
 const ActiveUserContext = createContext<ActiveUserContextType | undefined>(undefined);
 
 export function ActiveUserProvider({ children }: { children: ReactNode }) {
-  const [activeUserId, setActiveUserId] = useState<number | null>(null);
+  const [activeUserId, setActiveUserId] = useState<string | null>(null);
 
   return (
     <ActiveUserContext.Provider value={{ activeUserId, setActiveUserId }}>

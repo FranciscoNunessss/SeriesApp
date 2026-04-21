@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
-import { Series, Season } from '../types';
-import { seriesApi, seasonsApi } from '../api';
-import { Card, CardContent, CardHeader } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { Badge } from '../components/ui/Badge';
+import { Series, Season, UserProgress } from '../types';
+import { seriesApi, seasonsApi, watchedApi } from '../api';
+import { useActiveUser } from '../context/ActiveUserContext';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Badge } from '../components/ui/badge';
 import { Modal } from '../components/ui/Modal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import { ArrowLeft, Edit, Trash2, Plus, Eye, Calendar } from 'lucide-react';
+import { ProgressBar } from '../components/ui/ProgressBar';
+import { ArrowLeft, Edit, Trash2, Plus, Eye, Calendar, Film, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function SeriesDetailPage() {
   const { seriesId } = useParams();
   const navigate = useNavigate();
+  const { activeUserId } = useActiveUser();
 
   const [series, setSeries] = useState<Series | null>(null);
   const [seasons, setSeasons] = useState<Season[]>([]);
+  const [progress, setProgress] = useState<UserProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [showCreateSeason, setShowCreateSeason] = useState(false);
@@ -26,7 +29,7 @@ export function SeriesDetailPage() {
     if (seriesId) {
       loadData();
     }
-  }, [seriesId]);
+  }, [seriesId, activeUserId]);
 
   async function loadData() {
     try {
@@ -37,8 +40,13 @@ export function SeriesDetailPage() {
       ]);
       setSeries(seriesData);
       setSeasons(seasonsData.sort((a, b) => a.season_number - b.season_number));
+
+      if (activeUserId) {
+        const progressData = await watchedApi.getUserProgress(activeUserId, seriesId!);
+        setProgress(progressData);
+      }
     } catch (error) {
-      toast.error('Erro ao carregar detalhes da série');
+      toast.error('Failed to load series details');
       navigate('/series');
     } finally {
       setLoading(false);
@@ -48,154 +56,213 @@ export function SeriesDetailPage() {
   async function handleDeleteSeries() {
     try {
       await seriesApi.delete(seriesId!);
-      toast.success('Série eliminada com sucesso');
+      toast.success('Series deleted successfully');
       navigate('/series');
     } catch (error) {
-      toast.error('Erro ao eliminar série');
+      toast.error('Failed to delete series');
     }
   }
 
-  async function handleDeleteSeason(seasonId: number) {
+  async function handleDeleteSeason(seasonId: string) {
     try {
       await seasonsApi.delete(seasonId);
-      toast.success('Temporada eliminada com sucesso');
+      toast.success('Season deleted successfully');
       setDeletingSeason(null);
       loadData();
     } catch (error) {
-      toast.error('Erro ao eliminar temporada');
+      toast.error('Failed to delete season');
     }
   }
 
   async function handleCreateSeason(data: { season_number: number; release_year: number }) {
     try {
       await seasonsApi.create(seriesId!, data);
-      toast.success('Temporada criada com sucesso');
+      toast.success('Season created successfully');
       setShowCreateSeason(false);
       loadData();
     } catch (error) {
-      toast.error('Erro ao criar temporada');
+      toast.error('Failed to create season');
     }
   }
 
   if (loading || !series) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">A carregar...</div>
+      <div className="space-y-6 animate-pulse">
+        <div className="h-6 w-24 bg-white/[0.06] rounded-lg" />
+        <div className="h-40 bg-[#13131f] rounded-xl border border-white/[0.06]" />
+        <div className="h-28 bg-[#13131f] rounded-xl border border-white/[0.06]" />
       </div>
     );
   }
 
-  const getStatusVariant = (status: string | null) => {
+  const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'completed':
-        return 'secondary';
-      case 'ongoing':
-        return 'default';
-      case 'cancelled':
-        return 'destructive';
-      default:
-        return 'default';
+      case 'completed': return 'success';
+      case 'ongoing': return 'info';
+      case 'cancelled': return 'danger';
+      default: return 'secondary';
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/series')}
-          className="mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Voltar
-        </Button>
+      {/* Back button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => navigate('/series')}
+        className="text-slate-400 hover:text-white hover:bg-white/[0.06] -ml-1"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Series
+      </Button>
 
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl text-gray-900">{series.title}</h1>
-              <Badge variant={getStatusVariant(series.status)}>{series.status ?? 'sem estado'}</Badge>
+      {/* Hero card */}
+      <div className="relative rounded-xl bg-[#13131f] border border-white/[0.06] overflow-hidden">
+        <div className={`absolute top-0 left-0 right-0 h-0.5 ${
+          series.status === 'ongoing' ? 'bg-blue-500' :
+          series.status === 'completed' ? 'bg-emerald-500' :
+          'bg-red-500'
+        }`} />
+
+        <div className="p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 bg-violet-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Film className="w-7 h-7 text-violet-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <h1 className="text-2xl font-bold text-white">{series.title}</h1>
+                  <Badge variant={getStatusVariant(series.status) as any}>{series.status}</Badge>
+                </div>
+                <div className="flex items-center gap-3 text-sm text-slate-400">
+                  <span>{series.genre}</span>
+                  <span className="text-slate-600">·</span>
+                  <span>{series.release_year}</span>
+                  <span className="text-slate-600">·</span>
+                  <span>{series.total_seasons} {series.total_seasons === 1 ? 'season' : 'seasons'}</span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-gray-600">
-              <span>{series.genre ?? 'Sem género'}</span>
-              <span>•</span>
-              <span>{series.release_year ?? 'Ano N/D'}</span>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Link to={`/series/${seriesId}/edit`}>
-              <Button variant="secondary">
-                <Edit className="w-4 h-4" />
-                Editar
+            <div className="flex gap-2 flex-shrink-0">
+              <Link to={`/series/${seriesId}/edit`}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-slate-400 hover:text-white hover:bg-white/[0.06]"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit
+                </Button>
+              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-slate-500 hover:text-red-400 hover:bg-red-500/10"
+                onClick={() => setDeleteConfirm(true)}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
               </Button>
-            </Link>
-            <Button variant="danger" onClick={() => setDeleteConfirm(true)}>
-              <Trash2 className="w-4 h-4" />
-              Eliminar
-            </Button>
+            </div>
           </div>
+
+          {series.description && (
+            <p className="mt-4 text-sm text-slate-400 leading-relaxed max-w-2xl">
+              {series.description}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Description */}
-      <Card>
-        <CardContent className="p-6">
-          <p className="text-gray-600">{series.description ?? 'Sem descrição'}</p>
-        </CardContent>
-      </Card>
+      {/* User Progress */}
+      {activeUserId && progress && (
+        <div className="rounded-xl bg-[#13131f] border border-white/[0.06] p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-emerald-500/10 rounded-lg flex items-center justify-center">
+                <Layers className="w-3.5 h-3.5 text-emerald-400" />
+              </div>
+              <span className="text-sm font-semibold text-white">Your Progress</span>
+            </div>
+            <span className="text-sm text-slate-400">
+              <span className="text-white font-medium">{progress.watched_episodes}</span>
+              <span className="text-slate-600"> / </span>
+              {progress.total_episodes} episodes
+            </span>
+          </div>
+          <ProgressBar value={progress.percentage} showLabel />
+        </div>
+      )}
 
       {/* Seasons */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl text-gray-900">Temporadas</h2>
-          <Button onClick={() => setShowCreateSeason(true)}>
-            <Plus className="w-5 h-5" />
-            Adicionar Temporada
+          <h2 className="text-lg font-semibold text-white">Seasons</h2>
+          <Button
+            size="sm"
+            className="bg-violet-600 hover:bg-violet-500 text-white border-0"
+            onClick={() => setShowCreateSeason(true)}
+          >
+            <Plus className="w-4 h-4" />
+            Add Season
           </Button>
         </div>
 
         {seasons.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg text-gray-900 mb-2">Nenhuma temporada</h3>
-              <p className="text-gray-600 mb-4">Adicione temporadas para organizar os episódios</p>
-              <Button onClick={() => setShowCreateSeason(true)}>
-                <Plus className="w-5 h-5" />
-                Adicionar Temporada
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl bg-[#13131f] border border-white/[0.06] py-16 text-center">
+            <div className="w-14 h-14 bg-white/[0.04] rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Calendar className="w-7 h-7 text-slate-600" />
+            </div>
+            <h3 className="text-sm font-semibold text-white mb-1">No seasons yet</h3>
+            <p className="text-slate-500 text-sm mb-5">Add seasons to organize episodes</p>
+            <Button
+              size="sm"
+              className="bg-violet-600 hover:bg-violet-500 text-white border-0"
+              onClick={() => setShowCreateSeason(true)}
+            >
+              <Plus className="w-4 h-4" />
+              Add Season
+            </Button>
+          </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {seasons.map((season) => (
-              <Card key={season.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <h3 className="text-lg text-gray-900">Temporada {season.season_number}</h3>
-                      <Badge>{season.release_year ?? 'N/D'}</Badge>
+              <div
+                key={season.id}
+                className="group rounded-xl bg-[#13131f] border border-white/[0.06] hover:border-violet-500/25 hover:bg-[#16162a] transition-all duration-200 p-4"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-violet-500/10 rounded-lg flex items-center justify-center">
+                      <span className="text-sm font-bold text-violet-400">{season.season_number}</span>
                     </div>
-                    <div className="flex items-center gap-2 pt-2">
-                      <Link to={`/seasons/${season.id}`} className="flex-1">
-                        <Button variant="secondary" size="sm" className="w-full">
-                          <Eye className="w-4 h-4" />
-                          Ver
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeletingSeason(season)}
-                      >
-                        <Trash2 className="w-4 h-4 text-red-600" />
-                      </Button>
+                    <div>
+                      <p className="text-sm font-semibold text-white">Season {season.season_number}</p>
+                      <p className="text-xs text-slate-500">{season.release_year}</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-600 hover:text-red-400 hover:bg-red-500/10 h-7 w-7 p-0"
+                    onClick={() => setDeletingSeason(season)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+                <Link to={`/seasons/${season.id}`}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-slate-400 hover:text-white hover:bg-white/[0.06] text-xs h-8"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    View Episodes
+                  </Button>
+                </Link>
+              </div>
             ))}
           </div>
         )}
@@ -206,9 +273,9 @@ export function SeriesDetailPage() {
         isOpen={deleteConfirm}
         onClose={() => setDeleteConfirm(false)}
         onConfirm={handleDeleteSeries}
-        title="Eliminar Série"
-        message={`Tem certeza que deseja eliminar "${series.title}"? Isto também eliminará todas as temporadas e episódios.`}
-        confirmText="Eliminar"
+        title="Delete Series"
+        message={`Are you sure you want to delete "${series.title}"? This will also delete all seasons and episodes.`}
+        confirmText="Delete"
         variant="danger"
       />
 
@@ -218,9 +285,9 @@ export function SeriesDetailPage() {
           isOpen={true}
           onClose={() => setDeletingSeason(null)}
           onConfirm={() => handleDeleteSeason(deletingSeason.id)}
-          title="Eliminar Temporada"
-          message={`Tem certeza que deseja eliminar a Temporada ${deletingSeason.season_number}? Isto também eliminará todos os episódios.`}
-          confirmText="Eliminar"
+          title="Delete Season"
+          message={`Are you sure you want to delete Season ${deletingSeason.season_number}? This will also delete all episodes.`}
+          confirmText="Delete"
           variant="danger"
         />
       )}
@@ -251,10 +318,10 @@ function SeasonFormModal({ isOpen, onClose, onSubmit }: SeasonFormModalProps) {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Adicionar Temporada">
+    <Modal isOpen={isOpen} onClose={onClose} title="Add Season">
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
-          label="Número da Temporada"
+          label="Season Number"
           type="number"
           min="1"
           required
@@ -262,19 +329,21 @@ function SeasonFormModal({ isOpen, onClose, onSubmit }: SeasonFormModalProps) {
           onChange={(e) => setSeasonNumber(parseInt(e.target.value))}
         />
         <Input
-          label="Ano de Lançamento"
+          label="Release Year"
           type="number"
           min="1900"
-          max={new Date().getFullYear() + 5}
+          max={new Date().getFullYear()}
           required
           value={releaseYear}
           onChange={(e) => setReleaseYear(parseInt(e.target.value))}
         />
         <div className="flex gap-3 justify-end pt-4">
           <Button type="button" variant="ghost" onClick={onClose}>
-            Cancelar
+            Cancel
           </Button>
-          <Button type="submit">Criar Temporada</Button>
+          <Button type="submit" className="bg-violet-600 hover:bg-violet-500 text-white border-0">
+            Create Season
+          </Button>
         </div>
       </form>
     </Modal>
