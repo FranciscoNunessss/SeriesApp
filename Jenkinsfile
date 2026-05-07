@@ -64,19 +64,24 @@ pipeline {
                           exit 1
                         fi
 
-                        SSH_KEY_B64="$(base64 -w 0 "$SSH_KEY_FILE")"
+                        REPO_URL="$(git config --get remote.origin.url)"
+                        COMMIT_SHA="$(git rev-parse HEAD)"
 
-                        docker run --rm \
-                          -v "$WORKSPACE:/workspace" \
-                          -e ANSIBLE_SSH_KEY_B64="$SSH_KEY_B64" \
+                        set +x
+                        docker run --rm -i \
+                          -e REPO_URL="$REPO_URL" \
+                          -e COMMIT_SHA="$COMMIT_SHA" \
                           -e IMAGE_TAG="${BUILD_NUMBER}" \
-                          -w /workspace \
                           ghcr.io/ansible/creator-ee:latest \
                           /bin/bash -lc '
-                            echo "$ANSIBLE_SSH_KEY_B64" | base64 -d > /tmp/id_rsa_use
+                            set -e
+                            cat > /tmp/id_rsa_use
                             chmod 600 /tmp/id_rsa_use
-                            ansible-playbook -i /workspace/ansible/inventory /workspace/ansible/playbook.yml --extra-vars "image_tag=$IMAGE_TAG ansible_ssh_private_key_file=/tmp/id_rsa_use"
-                          '
+                            git clone "$REPO_URL" /workspace
+                            cd /workspace
+                            git checkout "$COMMIT_SHA"
+                            ansible-playbook -i ansible/inventory ansible/playbook.yml --extra-vars "image_tag=$IMAGE_TAG ansible_ssh_private_key_file=/tmp/id_rsa_use"
+                          ' < "$SSH_KEY_FILE"
                     '''
                 }
             }
