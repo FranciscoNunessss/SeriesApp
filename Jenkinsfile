@@ -4,8 +4,8 @@ pipeline {
     environment {
         DOCKERHUB_CREDENTIALS_ID = 'dockerhub-credentials'
         DOCKERHUB_USERNAME       = 'franciscoVelhinho99'
-        IMAGE_BACKEND            = "${franciscovelhinho99}/seriesapp-backend"
-        IMAGE_FRONTEND           = "${franciscovelhinho99}/seriesapp-frontend"
+        IMAGE_BACKEND            = "${DOCKERHUB_USERNAME}/seriesapp-backend"
+        IMAGE_FRONTEND           = "${DOCKERHUB_USERNAME}/seriesapp-frontend"
         EMAIL_RECIPIENT          = 'kikonunes.2004@hotmail.com'
     }
 
@@ -19,7 +19,7 @@ pipeline {
         stage('Build Backend') {
             steps {
                 script {
-                    backendImage = docker.build(
+                    def backendImage = docker.build(
                         "${IMAGE_BACKEND}:${BUILD_NUMBER}",
                         "-f Dockerfile ."
                     )
@@ -30,7 +30,7 @@ pipeline {
         stage('Build Frontend') {
             steps {
                 script {
-                    frontendImage = docker.build(
+                    def frontendImage = docker.build(
                         "${IMAGE_FRONTEND}:${BUILD_NUMBER}",
                         "--build-arg VITE_API_BASE_URL=http://SEU_SERVIDOR_IP:8000/api/v1 -f frontend/Dockerfile ./frontend"
                     )
@@ -42,6 +42,9 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('https://registry.hub.docker.com', DOCKERHUB_CREDENTIALS_ID) {
+                        def backendImage = docker.image("${IMAGE_BACKEND}:${BUILD_NUMBER}")
+                        def frontendImage = docker.image("${IMAGE_FRONTEND}:${BUILD_NUMBER}")
+
                         backendImage.push("${BUILD_NUMBER}")
                         backendImage.push('latest')
                         frontendImage.push("${BUILD_NUMBER}")
