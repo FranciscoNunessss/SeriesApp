@@ -83,7 +83,7 @@ pipeline {
                             cd /workspace
                             git checkout "$COMMIT_SHA"
 
-                                                        TARGET_HOST="$(awk '/ansible_host=/{for(i=1;i<=NF;i++) if($i ~ /^ansible_host=/){split($i,a,"=");print a[2]}}' ansible/inventory | head -n1)"
+                                                        TARGET_HOST="$(sed -n \"s/.*ansible_host=\\([^ ]*\\).*/\\1/p\" ansible/inventory | head -n1)"
                                                         if [ -z "$TARGET_HOST" ]; then
                                                             echo "Erro: ansible_host nao encontrado em ansible/inventory"
                                                             exit 1
