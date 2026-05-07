@@ -5,7 +5,7 @@
 
   vars:
     app_dir: /opt/seriesapp
-    dockerhub_username: "SEU_USERNAME_DOCKERHUB"
+    dockerhub_username: "franciscovelhinho99"
     image_tag: "latest"
 
   tasks:

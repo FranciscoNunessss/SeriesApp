@@ -6,7 +6,7 @@ pipeline {
         DOCKERHUB_USERNAME       = 'SEU_USERNAME_DOCKERHUB'
         IMAGE_BACKEND            = "${franciscovelhinho99}/seriesapp-backend"
         IMAGE_FRONTEND           = "${franciscovelhinho99}/seriesapp-frontend"
-        EMAIL_RECIPIENT          = 'SEU_EMAIL@exemplo.com'
+        EMAIL_RECIPIENT          = 'kikonunes.2004@hotmail.com'
     }
 
     stages {
