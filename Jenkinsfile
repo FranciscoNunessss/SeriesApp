@@ -33,7 +33,7 @@ pipeline {
                 script {
                     def frontendImage = docker.build(
                         "${IMAGE_FRONTEND}:${BUILD_NUMBER}",
-                        "--build-arg VITE_API_BASE_URL=http://SEU_SERVIDOR_IP:8000/api/v1 -f frontend/Dockerfile ./frontend"
+                        "--build-arg VITE_API_BASE_URL=http://46.225.89.56:8000/api/v1 -f frontend/Dockerfile ./frontend"
                     )
                 }
             }
@@ -72,6 +72,7 @@ pipeline {
                           -e REPO_URL="$REPO_URL" \
                           -e COMMIT_SHA="$COMMIT_SHA" \
                           -e IMAGE_TAG="${BUILD_NUMBER}" \
+                          -e ANSIBLE_HOST_KEY_CHECKING=False \
                           ghcr.io/ansible/creator-ee:latest \
                           /bin/bash -lc '
                             set -e
