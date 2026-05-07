@@ -18,6 +18,21 @@
         - /etc/apt/sources.list.d/jenkins.list
         - /etc/apt/sources.list.d/jenkins.sources
 
+    - name: Remover entradas Docker antigas de /etc/apt/sources.list
+      lineinfile:
+        path: /etc/apt/sources.list
+        regexp: '^deb .*download\.docker\.com/linux/ubuntu.*$'
+        state: absent
+
+    - name: Remover ficheiros de repositorio Docker legados em sources.list.d
+      shell: |
+        set -e
+        find /etc/apt/sources.list.d -maxdepth 1 -type f \( -name '*.list' -o -name '*.sources' \) -print0 \
+          | xargs -0 -r grep -l 'download.docker.com/linux/ubuntu' \
+          | xargs -r rm -f
+      args:
+        executable: /bin/bash
+
     # ── Instalação do Docker ──────────────────────────────────────────────────
 
     - name: Instalar pacotes necessarios
