@@ -59,7 +59,7 @@ pipeline {
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: ANSIBLE_SSH_KEY_CRED_ID, keyFileVariable: 'SSH_KEY_FILE')]) {
                     sh '''
-                        if grep -q "46.225.89.56" ansible/inventory; then
+                        if grep -q "SEU_SERVIDOR_IP" ansible/inventory; then
                           echo "Erro: atualiza ansible/inventory com o IP real do servidor."
                           exit 1
                         fi
