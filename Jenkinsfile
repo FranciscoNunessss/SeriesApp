@@ -64,12 +64,14 @@ pipeline {
                           exit 1
                         fi
 
+                        SSH_KEY_B64="$(base64 -w 0 "$SSH_KEY_FILE")"
+
                         docker run --rm \
                           -v "$WORKSPACE:/workspace" \
-                          -v "$SSH_KEY_FILE:/tmp/id_rsa:ro" \
+                          -e ANSIBLE_SSH_KEY_B64="$SSH_KEY_B64" \
                           -w /workspace \
                           ghcr.io/ansible/creator-ee:latest \
-                          /bin/bash -lc "cp /tmp/id_rsa /tmp/id_rsa_use && chmod 600 /tmp/id_rsa_use && ansible-playbook -i ansible/inventory ansible/playbook.yml --extra-vars 'image_tag=${BUILD_NUMBER} ansible_ssh_private_key_file=/tmp/id_rsa_use'"
+                          /bin/bash -lc "echo \"\$ANSIBLE_SSH_KEY_B64\" | base64 -d > /tmp/id_rsa_use && chmod 600 /tmp/id_rsa_use && ansible-playbook -i ansible/inventory ansible/playbook.yml --extra-vars 'image_tag=${BUILD_NUMBER} ansible_ssh_private_key_file=/tmp/id_rsa_use'"
                     '''
                 }
             }
