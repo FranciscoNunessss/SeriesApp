@@ -57,7 +57,7 @@ pipeline {
 
         stage('Deploy with Ansible') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: ANSIBLE_SSH_KEY_CRED_ID, keyFileVariable: 'SSH_KEY_FILE')]) {
+                withCredentials([sshUserPrivateKey(credentialsId: ANSIBLE_SSH_KEY_CRED_ID, keyFileVariable: 'SSH_KEY_FILE', usernameVariable: 'SSH_USER')]) {
                     sh '''
                         if grep -q "SEU_SERVIDOR_IP" ansible/inventory; then
                           echo "Erro: atualiza ansible/inventory com o IP real do servidor."
@@ -72,6 +72,7 @@ pipeline {
                           -e REPO_URL="$REPO_URL" \
                           -e COMMIT_SHA="$COMMIT_SHA" \
                           -e IMAGE_TAG="${BUILD_NUMBER}" \
+                                                    -e SSH_USER="$SSH_USER" \
                           -e ANSIBLE_HOST_KEY_CHECKING=False \
                           ghcr.io/ansible/creator-ee:latest \
                           /bin/bash -lc '
@@ -81,8 +82,17 @@ pipeline {
                             git clone "$REPO_URL" /workspace
                             cd /workspace
                             git checkout "$COMMIT_SHA"
+
+                                                        TARGET_HOST="$(awk '/ansible_host=/{for(i=1;i<=NF;i++) if($i ~ /^ansible_host=/){split($i,a,"=");print a[2]}}' ansible/inventory | head -n1)"
+                                                        if [ -z "$TARGET_HOST" ]; then
+                                                            echo "Erro: ansible_host nao encontrado em ansible/inventory"
+                                                            exit 1
+                                                        fi
+
+                                                        ssh -i /tmp/id_rsa_use -o StrictHostKeyChecking=no -o BatchMode=yes "$SSH_USER@$TARGET_HOST" "echo ssh_ok" >/dev/null
+
                             ansible-playbook -i ansible/inventory ansible/playbook.yml \
-                              --extra-vars "image_tag=$IMAGE_TAG ansible_ssh_private_key_file=/tmp/id_rsa_use"
+                                                            --extra-vars "image_tag=$IMAGE_TAG ansible_ssh_private_key_file=/tmp/id_rsa_use ansible_user=$SSH_USER"
                           ' < "$SSH_KEY_FILE"
                     '''
                 }
