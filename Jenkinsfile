@@ -81,11 +81,8 @@ pipeline {
                             git clone "$REPO_URL" /workspace
                             cd /workspace
                             git checkout "$COMMIT_SHA"
-                            export ANSIBLE_SSH_ARGS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
                             ansible-playbook -i ansible/inventory ansible/playbook.yml \
-                              --extra-vars "image_tag=$IMAGE_TAG" \
-                              -e ansible_ssh_private_key_file=/tmp/id_rsa_use \
-                              -e ansible_ssh_common_args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+                              --extra-vars "image_tag=$IMAGE_TAG ansible_ssh_private_key_file=/tmp/id_rsa_use"
                           ' < "$SSH_KEY_FILE"
                     '''
                 }
