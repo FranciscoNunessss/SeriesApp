@@ -83,13 +83,18 @@ pipeline {
                             cd /workspace
                             git checkout "$COMMIT_SHA"
 
-                                                        TARGET_HOST="$(sed -n \"s/.*ansible_host=\\([^ ]*\\).*/\\1/p\" ansible/inventory | head -n1)"
+                                                        TARGET_HOST="$(sed -n "s/.*ansible_host=\\([^ ]*\\).*/\\1/p" ansible/inventory | head -n1)"
                                                         if [ -z "$TARGET_HOST" ]; then
                                                             echo "Erro: ansible_host nao encontrado em ansible/inventory"
                                                             exit 1
                                                         fi
 
-                                                        ssh -i /tmp/id_rsa_use -o StrictHostKeyChecking=no -o BatchMode=yes "$SSH_USER@$TARGET_HOST" "echo ssh_ok" >/dev/null
+                                                        echo "Validando acesso SSH para $SSH_USER@$TARGET_HOST..."
+                                                        if ! ssh -i /tmp/id_rsa_use -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 "$SSH_USER@$TARGET_HOST" "echo ssh_ok" >/dev/null; then
+                                                            echo "Erro: autenticacao SSH falhou para $SSH_USER@$TARGET_HOST."
+                                                            echo "Verifica no Jenkins credential ansible-ssh-key se a private key corresponde a authorized_keys do servidor."
+                                                            exit 255
+                                                        fi
 
                             ansible-playbook -i ansible/inventory ansible/playbook.yml \
                                                             --extra-vars "image_tag=$IMAGE_TAG ansible_ssh_private_key_file=/tmp/id_rsa_use ansible_user=$SSH_USER"

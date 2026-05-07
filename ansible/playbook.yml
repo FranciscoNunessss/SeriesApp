@@ -10,6 +10,14 @@
 
   tasks:
 
+    - name: Remover repositorio Jenkins legado (se existir)
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/jenkins.list
+        - /etc/apt/sources.list.d/jenkins.sources
+
     # ── Instalação do Docker ──────────────────────────────────────────────────
 
     - name: Instalar pacotes necessarios

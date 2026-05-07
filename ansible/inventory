@@ -1,5 +1,5 @@
 [seriesapp_servers]
-seriesapp ansible_host=46.225.89.56 ansible_user=ubuntu
+seriesapp ansible_host=46.225.89.56 ansible_user=root
 
 [seriesapp_servers:vars]
 ansible_python_interpreter=/usr/bin/python3
