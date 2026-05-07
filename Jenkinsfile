@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS_ID = 'dockerhub-credentials'
-        DOCKERHUB_USERNAME       = 'SEU_USERNAME_DOCKERHUB'
+        DOCKERHUB_USERNAME       = 'franciscoVelhinho99'
         IMAGE_BACKEND            = "${franciscovelhinho99}/seriesapp-backend"
         IMAGE_FRONTEND           = "${franciscovelhinho99}/seriesapp-frontend"
         EMAIL_RECIPIENT          = 'kikonunes.2004@hotmail.com'
