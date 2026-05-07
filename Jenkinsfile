@@ -56,8 +56,6 @@ pipeline {
 
         stage('Deploy with Ansible') {
             steps {
-                pip install ansible
-            
                 sh "ansible-playbook -i ansible/inventory ansible/playbook.yml --extra-vars 'image_tag=${BUILD_NUMBER}'"
             }
         }
