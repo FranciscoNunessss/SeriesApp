@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS_ID = 'dockerhub-credentials'
+        ANSIBLE_SSH_KEY_CRED_ID  = 'ansible-ssh-key'
         DOCKERHUB_USERNAME       = 'franciscovelhinho99'
         IMAGE_BACKEND            = "${DOCKERHUB_USERNAME}/seriesapp-backend"
         IMAGE_FRONTEND           = "${DOCKERHUB_USERNAME}/seriesapp-frontend"
@@ -56,7 +57,21 @@ pipeline {
 
         stage('Deploy with Ansible') {
             steps {
-                sh "ansible-playbook -i ansible/inventory ansible/playbook.yml --extra-vars 'image_tag=${BUILD_NUMBER}'"
+                withCredentials([sshUserPrivateKey(credentialsId: ANSIBLE_SSH_KEY_CRED_ID, keyFileVariable: 'SSH_KEY_FILE')]) {
+                    sh '''
+                        if grep -q "46.225.89.56" ansible/inventory; then
+                          echo "Erro: atualiza ansible/inventory com o IP real do servidor."
+                          exit 1
+                        fi
+
+                        docker run --rm \
+                          -v "$WORKSPACE:/workspace" \
+                          -v "$SSH_KEY_FILE:/tmp/id_rsa:ro" \
+                          -w /workspace \
+                          ghcr.io/ansible/creator-ee:latest \
+                          /bin/bash -lc "cp /tmp/id_rsa /tmp/id_rsa_use && chmod 600 /tmp/id_rsa_use && ansible-playbook -i ansible/inventory ansible/playbook.yml --extra-vars 'image_tag=${BUILD_NUMBER} ansible_ssh_private_key_file=/tmp/id_rsa_use'"
+                    '''
+                }
             }
         }
     }
