@@ -3,9 +3,10 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS_ID = 'dockerhub-credentials'
-        DOCKERHUB_USERNAME       = 'SEU_USERNAME_DOCKERHUB'
-        IMAGE_BACKEND            = "${franciscovelhinho99}/seriesapp-backend"
-        IMAGE_FRONTEND           = "${franciscovelhinho99}/seriesapp-frontend"
+        ANSIBLE_SSH_KEY_CRED_ID  = 'ansible-ssh-key'
+        DOCKERHUB_USERNAME       = 'franciscovelhinho99'
+        IMAGE_BACKEND            = "${DOCKERHUB_USERNAME}/seriesapp-backend"
+        IMAGE_FRONTEND           = "${DOCKERHUB_USERNAME}/seriesapp-frontend"
         EMAIL_RECIPIENT          = 'kikonunes.2004@hotmail.com'
     }
 
@@ -19,7 +20,7 @@ pipeline {
         stage('Build Backend') {
             steps {
                 script {
-                    backendImage = docker.build(
+                    def backendImage = docker.build(
                         "${IMAGE_BACKEND}:${BUILD_NUMBER}",
                         "-f Dockerfile ."
                     )
@@ -30,9 +31,9 @@ pipeline {
         stage('Build Frontend') {
             steps {
                 script {
-                    frontendImage = docker.build(
+                    def frontendImage = docker.build(
                         "${IMAGE_FRONTEND}:${BUILD_NUMBER}",
-                        "--build-arg VITE_API_BASE_URL=http://SEU_SERVIDOR_IP:8000/api/v1 -f frontend/Dockerfile ./frontend"
+                        "--build-arg VITE_API_BASE_URL=http://46.225.89.56:8000/api/v1 -f frontend/Dockerfile ./frontend"
                     )
                 }
             }
@@ -42,6 +43,9 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('https://registry.hub.docker.com', DOCKERHUB_CREDENTIALS_ID) {
+                        def backendImage = docker.image("${IMAGE_BACKEND}:${BUILD_NUMBER}")
+                        def frontendImage = docker.image("${IMAGE_FRONTEND}:${BUILD_NUMBER}")
+
                         backendImage.push("${BUILD_NUMBER}")
                         backendImage.push('latest')
                         frontendImage.push("${BUILD_NUMBER}")
@@ -53,7 +57,50 @@ pipeline {
 
         stage('Deploy with Ansible') {
             steps {
-                sh "ansible-playbook -i ansible/inventory ansible/playbook.yml --extra-vars 'image_tag=${BUILD_NUMBER}'"
+                withCredentials([sshUserPrivateKey(credentialsId: ANSIBLE_SSH_KEY_CRED_ID, keyFileVariable: 'SSH_KEY_FILE', usernameVariable: 'SSH_USER')]) {
+                    sh '''
+                        if grep -q "SEU_SERVIDOR_IP" ansible/inventory; then
+                          echo "Erro: atualiza ansible/inventory com o IP real do servidor."
+                          exit 1
+                        fi
+
+                        REPO_URL="$(git config --get remote.origin.url)"
+                        COMMIT_SHA="$(git rev-parse HEAD)"
+
+                        set +x
+                        docker run --rm -i \
+                          -e REPO_URL="$REPO_URL" \
+                          -e COMMIT_SHA="$COMMIT_SHA" \
+                          -e IMAGE_TAG="${BUILD_NUMBER}" \
+                                                    -e SSH_USER="$SSH_USER" \
+                          -e ANSIBLE_HOST_KEY_CHECKING=False \
+                          ghcr.io/ansible/creator-ee:latest \
+                          /bin/bash -lc '
+                            set -e
+                            cat > /tmp/id_rsa_use
+                            chmod 600 /tmp/id_rsa_use
+                            git clone "$REPO_URL" /workspace
+                            cd /workspace
+                            git checkout "$COMMIT_SHA"
+
+                                                        TARGET_HOST="$(sed -n "s/.*ansible_host=\\([^ ]*\\).*/\\1/p" ansible/inventory | head -n1)"
+                                                        if [ -z "$TARGET_HOST" ]; then
+                                                            echo "Erro: ansible_host nao encontrado em ansible/inventory"
+                                                            exit 1
+                                                        fi
+
+                                                        echo "Validando acesso SSH para $SSH_USER@$TARGET_HOST..."
+                                                        if ! ssh -i /tmp/id_rsa_use -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 "$SSH_USER@$TARGET_HOST" "echo ssh_ok" >/dev/null; then
+                                                            echo "Erro: autenticacao SSH falhou para $SSH_USER@$TARGET_HOST."
+                                                            echo "Verifica no Jenkins credential ansible-ssh-key se a private key corresponde a authorized_keys do servidor."
+                                                            exit 255
+                                                        fi
+
+                            ansible-playbook -i ansible/inventory ansible/playbook.yml \
+                                                            --extra-vars "image_tag=$IMAGE_TAG ansible_ssh_private_key_file=/tmp/id_rsa_use ansible_user=$SSH_USER"
+                          ' < "$SSH_KEY_FILE"
+                    '''
+                }
             }
         }
     }
