@@ -17,6 +17,19 @@ pipeline {
             }
         }
 
+        stage('Tests') {
+            steps {
+                sh '''
+                    docker run --rm \
+                      -v "$PWD:/workspace" \
+                      -w /workspace \
+                      -e PYTHONPATH=/workspace/src \
+                      python:3.13-slim \
+                      sh -lc "pip install --no-cache-dir -r requirements.txt pytest && pytest -q"
+                '''
+            }
+        }
+
         stage('Build Backend') {
             steps {
                 script {
